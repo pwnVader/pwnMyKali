@@ -185,13 +185,28 @@ install_packages() {
     fi
     ok "WM core verificado"
 
+    # ── VMware integration is critical when running inside VMware ────────────
+    # Without open-vm-tools-desktop the user has no clipboard sync, dynamic
+    # resolution, and most importantly keyboard/mouse pass-through can break
+    # inside the X session (host events stop reaching X clients).
+    local virt=""
+    command -v systemd-detect-virt >/dev/null && virt=$(systemd-detect-virt 2>/dev/null || true)
+    if [[ "$virt" == "vmware" ]] \
+       || grep -qi vmware /sys/class/dmi/id/sys_vendor 2>/dev/null \
+       || grep -qi vmware /sys/class/dmi/id/product_name 2>/dev/null; then
+        log "Detectado VMware → instalando open-vm-tools-desktop como crítico"
+        apt_install_strict open-vm-tools open-vm-tools-desktop || return 1
+        sudo systemctl enable --now open-vm-tools.service 2>/dev/null || true
+    else
+        apt_install_soft open-vm-tools open-vm-tools-desktop
+    fi
+
     # ── Optional / nice-to-have — install one by one ─────────────────────────
     log "Instalando utilidades opcionales (fallos no abortan)"
     apt_install_soft \
         ranger thunar lsd bat bpython fastfetch \
         fonts-jetbrains-mono fonts-hack \
         network-manager-gnome \
-        open-vm-tools open-vm-tools-desktop \
         firefox-esr \
         dirsearch feroxbuster gobuster nmap
 }
