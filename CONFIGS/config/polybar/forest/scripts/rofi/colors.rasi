@@ -1,0 +1,10 @@
+/* Catppuccin Mocha — rofi palette */
+
+* {
+  al:   #00000000;
+  bg:   #1e1e2eFF;
+  bga:  #313244FF;
+  fg:   #cdd6f4FF;
+  ac:   #f5c2e7FF;
+  se:   #89b4faFF;
+}

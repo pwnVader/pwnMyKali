@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# pwnMyKali — list pending apt updates (one package per line).
+# Uses a private apt list cache so the system DB is not touched.
+#
+
+set -uo pipefail
+
+CACHE_DIR="${TMPDIR:-/tmp}/pwnmykali-apt-${USER}"
+mkdir -p "$CACHE_DIR/lists/partial" "$CACHE_DIR/archives/partial"
+
+APT_OPTS=(
+    -o Dir::State::Lists="$CACHE_DIR/lists"
+    -o Dir::Cache::Archives="$CACHE_DIR/archives"
+    -o Debug::NoLocking=true
+    -o APT::Update::Error-Mode=any
+)
+
+apt-get "${APT_OPTS[@]}" update -qq >/dev/null 2>&1 || exit 1
+apt-get "${APT_OPTS[@]}" -s upgrade 2>/dev/null \
+    | awk '/^Inst /{print $2}'

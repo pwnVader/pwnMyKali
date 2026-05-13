@@ -1,0 +1,51 @@
+#!/bin/sh
+# pwnMyKali — bspwm autostart
+
+# Java workaround for tiling WMs (Burp, ZAP, etc.)
+wmname LG3D &
+
+# VMware integration (no-op outside VMware)
+command -v vmware-user-suid-wrapper >/dev/null && vmware-user-suid-wrapper &
+
+# Hotkey daemon
+pgrep -x sxhkd >/dev/null || sxhkd &
+
+# Workspaces
+bspc monitor -d 1 2 3 4 5 6 7 8 9 10
+
+# Window layout
+bspc config border_width         2
+bspc config window_gap          12
+bspc config split_ratio          0.52
+bspc config borderless_monocle   true
+bspc config gapless_monocle      true
+bspc config focus_follows_pointer true
+
+# Rules
+bspc rule -a Gimp        desktop='^8' state=floating follow=on
+bspc rule -a Chromium    desktop='^2'
+bspc rule -a firefox     desktop='^2'
+bspc rule -a Burp\ Suite\ Professional state=floating
+bspc rule -a mplayer2    state=floating
+bspc rule -a Screenkey   manage=off
+
+# Wallpaper — first match wins
+WALLPAPER=$(find "$HOME/Wallpapers" -maxdepth 1 -type f \
+            \( -iname 'wallpaper.*' -o -iname '*.jpg' -o -iname '*.png' \) \
+            2>/dev/null | head -n1)
+[ -n "$WALLPAPER" ] && feh --bg-fill "$WALLPAPER" &
+
+# Compositor
+pgrep -x picom >/dev/null || picom &
+bspc config border_width 0
+
+# Polybar
+"$HOME/.config/polybar/forest/launch.sh" &
+
+# Cursor
+xsetroot -cursor_name left_ptr &
+
+# Resolution autodetect: try VMware first, fall back to anything connected.
+# Adjust the mode if you want a fixed resolution.
+PRIMARY=$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1; exit}')
+[ -n "$PRIMARY" ] && xrandr --output "$PRIMARY" --auto &

@@ -1,0 +1,15 @@
+# Force LF for shell / config files so they run on Linux even when cloned on Windows.
+*.sh        text eol=lf
+*.zsh       text eol=lf
+*.conf      text eol=lf
+*.ini       text eol=lf
+*.rasi      text eol=lf
+*rc         text eol=lf
+checkupdates text eol=lf
+bspwm_resize text eol=lf
+bspwmrc     text eol=lf
+sxhkdrc     text eol=lf
+
+# Images are binary
+*.png binary
+*.jpg binary

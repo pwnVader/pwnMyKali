@@ -1,0 +1,15 @@
+# pwnMyKali — VCS ignores
+
+# Installer artifacts (created at runtime on the target machine)
+.pwnmykali-backup-*/
+pwnmykali-install-*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
