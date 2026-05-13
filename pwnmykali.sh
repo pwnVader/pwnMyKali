@@ -266,6 +266,23 @@ deploy_configs() {
     cp -rf "$RPATH/WALLPAPERS/"* "$HOME/Wallpapers/"
 }
 
+register_xsession() {
+    # The bspwm apt package on Debian/Kali installs the binary but does NOT
+    # drop a session file in /usr/share/xsessions/, so it never appears in the
+    # LightDM session picker. We create it ourselves.
+    log "Registrando bspwm como sesión X11 (/usr/share/xsessions/bspwm.desktop)"
+    sudo mkdir -p /usr/share/xsessions
+    sudo tee /usr/share/xsessions/bspwm.desktop >/dev/null <<'EOF'
+[Desktop Entry]
+Name=bspwm
+Comment=Binary space partitioning window manager
+Exec=bspwm
+TryExec=bspwm
+Type=Application
+DesktopNames=bspwm
+EOF
+}
+
 run_install() {
     # All the heavy lifting. Output is teed to LOG_FILE by main().
     backup_existing
@@ -275,6 +292,7 @@ run_install() {
     install_fzf_keybinds
     install_tmux_oh_my_tmux
     deploy_configs
+    register_xsession
 }
 
 main() {
