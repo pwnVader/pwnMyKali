@@ -63,14 +63,61 @@ require_kali() {
 ask_timezone() {
     local current
     current=$(timedatectl show -p Timezone --value 2>/dev/null || echo "UTC")
-    printf "%s[?]%s Timezone actual: %s\n" "$YELLOW" "$RESET" "$current"
-    read -rp "    Nueva timezone (Enter para mantener, ej: Europe/Madrid, America/Mexico_City): " TZ_INPUT
-    if [[ -n "${TZ_INPUT}" ]]; then
-        if timedatectl list-timezones | grep -qx "$TZ_INPUT"; then
-            sudo timedatectl set-timezone "$TZ_INPUT" && ok "Timezone → $TZ_INPUT"
-        else
-            warn "Timezone inválida; se mantiene $current"
-        fi
+
+    local -a zones=(
+        "America/Mexico_City"
+        "America/Bogota"
+        "America/Argentina/Buenos_Aires"
+        "America/Santiago"
+        "America/Lima"
+        "America/Caracas"
+        "America/Los_Angeles"
+        "America/New_York"
+        "Europe/Madrid"
+        "Europe/London"
+        "UTC"
+    )
+
+    printf "\n%s[?]%s Configurar zona horaria del sistema\n" "$YELLOW" "$RESET"
+    printf "    Actual: %s%s%s\n\n" "$GREEN" "$current" "$RESET"
+    printf "    Opciones rápidas:\n"
+    local i=1
+    for z in "${zones[@]}"; do
+        printf "      %2d) %s\n" "$i" "$z"
+        i=$((i+1))
+    done
+    printf "       0) Mantener la actual\n"
+    printf "       c) Escribir una personalizada (formato Region/City)\n\n"
+
+    local choice
+    read -rp "    Tu elección [0]: " choice
+    choice="${choice:-0}"
+
+    local target=""
+    case "$choice" in
+        0|"")    ok "Timezone sin cambios ($current)"; return ;;
+        c|C)
+            read -rp "    Timezone (ej: America/Mexico_City): " target
+            ;;
+        *)
+            if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#zones[@]} )); then
+                target="${zones[$((choice-1))]}"
+            else
+                warn "Opción inválida; se mantiene $current"
+                return
+            fi
+            ;;
+    esac
+
+    if [[ -z "$target" ]]; then
+        warn "No se especificó timezone; se mantiene $current"
+        return
+    fi
+
+    if timedatectl list-timezones | grep -qx "$target"; then
+        sudo timedatectl set-timezone "$target" && ok "Timezone → $target"
+    else
+        warn "Timezone '$target' no es válida; se mantiene $current"
     fi
 }
 
@@ -219,15 +266,8 @@ deploy_configs() {
     cp -rf "$RPATH/WALLPAPERS/"* "$HOME/Wallpapers/"
 }
 
-main() {
-    require_user
-    banner
-    require_kali
-
-    log "Log de la instalación: $LOG_FILE"
-    exec > >(tee -a "$LOG_FILE") 2>&1
-
-    ask_timezone
+run_install() {
+    # All the heavy lifting. Output is teed to LOG_FILE by main().
     backup_existing
     install_packages
     install_nerd_fonts
@@ -235,11 +275,36 @@ main() {
     install_fzf_keybinds
     install_tmux_oh_my_tmux
     deploy_configs
+}
 
+main() {
+    require_user
+    banner
+    require_kali
+    log "Log de la instalación: $LOG_FILE"
+
+    # Interactive prompts run BEFORE we attach tee so the menu does not
+    # contaminate the log and the script does not appear to "hang" later.
+    ask_timezone
+
+    # Tee just the install block; once it ends, tee exits cleanly and the
+    # shell returns control to the user (no stuck stdout pipe at reboot time).
+    run_install 2>&1 | tee -a "$LOG_FILE"
+    local rc=${PIPESTATUS[0]}
+
+    sync
     echo
+    if [[ $rc -ne 0 ]]; then
+        err "La instalación terminó con errores (rc=$rc). Revisa $LOG_FILE"
+        exit "$rc"
+    fi
+
     ok "Entorno desplegado correctamente."
     log "Backup de tu configuración anterior: $BACKUP_DIR"
-    log "Reinicia y selecciona la sesión 'bspwm' en el login: sudo reboot"
+    log "Log completo: $LOG_FILE"
+    echo
+    log "Reinicia con:  sudo reboot"
+    log "En la pantalla de login, selecciona la sesión 'bspwm' antes de entrar."
 }
 
 main "$@"

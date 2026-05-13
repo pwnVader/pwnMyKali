@@ -30,13 +30,12 @@ HISTSIZE=10000
 SAVEHIST=10000
 setopt HIST_IGNORE_ALL_DUPS HIST_IGNORE_SPACE SHARE_HISTORY
 
-# Modern coreutils replacements
-alias ls='lsd'
+# Modern alternatives — kept as new commands, not overrides of `ls` / `cat`,
+# so muscle memory and scripts that depend on coreutils keep working.
 alias ll='lsd -lh'
 alias la='lsd -lha'
 alias lt='lsd --tree'
-alias cat='batcat --paging=never'
-alias catn='/usr/bin/cat'
+alias bcat='batcat --paging=never'
 alias vim='nvim'
 alias vi='nvim'
 
