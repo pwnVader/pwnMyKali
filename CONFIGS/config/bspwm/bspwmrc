@@ -45,7 +45,9 @@ bspc config border_width 0
 # Cursor
 xsetroot -cursor_name left_ptr &
 
-# Resolution autodetect: try VMware first, fall back to anything connected.
-# Adjust the mode if you want a fixed resolution.
-PRIMARY=$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1; exit}')
-[ -n "$PRIMARY" ] && xrandr --output "$PRIMARY" --auto &
+# NOTE: deliberately NOT hardcoding xrandr here. Inside VMware,
+# vmware-user-suid-wrapper listens for window-resize events from the host and
+# calls xrandr on demand, so the guest auto-fits to whatever size you drag the
+# VMware window to. Locking the output to a fixed mode at startup defeats that.
+# If you are NOT on VMware and your screen comes up the wrong size, uncomment:
+#   xrandr --output "$(xrandr | awk '/ connected/ {print $1; exit}')" --auto &
