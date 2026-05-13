@@ -136,28 +136,64 @@ backup_existing() {
     done
 }
 
-apt_install() {
-    sudo apt install -y --no-install-recommends "$@"
+apt_install_strict() {
+    # Critical group — abort the installer if anything in the group fails.
+    if ! sudo apt install -y --no-install-recommends "$@"; then
+        err "Fallo crítico instalando: $*"
+        return 1
+    fi
+}
+
+apt_install_soft() {
+    # Optional group — install best-effort, one package at a time so a single
+    # broken / renamed / disappeared package does not poison the whole batch.
+    local missing=()
+    for pkg in "$@"; do
+        sudo apt install -y --no-install-recommends "$pkg" >/dev/null 2>&1 \
+            || missing+=("$pkg")
+    done
+    if (( ${#missing[@]} > 0 )); then
+        warn "Paquetes opcionales que no se pudieron instalar: ${missing[*]}"
+    fi
 }
 
 install_packages() {
     log "Actualizando índice de paquetes"
     sudo apt update
 
-    log "Instalando paquetes del entorno"
-    apt_install \
-        git curl wget unzip zsh tmux vim neovim \
-        bspwm sxhkd polybar picom rofi \
-        kitty feh scrot imagemagick xclip xsel xdotool wmname \
-        ranger thunar lsd bat bpython fastfetch fzf \
-        fonts-jetbrains-mono fonts-hack \
-        firefox-esr \
-        network-manager-gnome \
-        acpi \
-        open-vm-tools open-vm-tools-desktop
+    # ── Core WM stack — installer is useless without these ───────────────────
+    log "Instalando WM core (bspwm, sxhkd, polybar, picom, rofi, kitty)"
+    apt_install_strict \
+        bspwm sxhkd polybar picom rofi kitty || return 1
 
-    log "Paquetes opcionales para pentesting (ignorados si no existen)"
-    sudo apt install -y dirsearch feroxbuster gobuster nmap || true
+    # suckless-tools provides `wmname`, needed by bspwmrc for the Java fix.
+    # The package name does NOT match the binary name — known footgun.
+    log "Instalando shell + utilidades base"
+    apt_install_strict \
+        git curl wget unzip zsh tmux vim neovim fzf \
+        feh scrot imagemagick xclip xsel xdotool suckless-tools \
+        acpi || return 1
+
+    # Verify the critical binaries actually landed.
+    local missing_core=()
+    for bin in bspwm sxhkd polybar picom kitty rofi wmname feh; do
+        command -v "$bin" >/dev/null || missing_core+=("$bin")
+    done
+    if (( ${#missing_core[@]} > 0 )); then
+        err "Tras la instalación faltan binarios críticos: ${missing_core[*]}"
+        return 1
+    fi
+    ok "WM core verificado"
+
+    # ── Optional / nice-to-have — install one by one ─────────────────────────
+    log "Instalando utilidades opcionales (fallos no abortan)"
+    apt_install_soft \
+        ranger thunar lsd bat bpython fastfetch \
+        fonts-jetbrains-mono fonts-hack \
+        network-manager-gnome \
+        open-vm-tools open-vm-tools-desktop \
+        firefox-esr \
+        dirsearch feroxbuster gobuster nmap
 }
 
 install_nerd_fonts() {
@@ -285,14 +321,16 @@ EOF
 
 run_install() {
     # All the heavy lifting. Output is teed to LOG_FILE by main().
-    backup_existing
-    install_packages
-    install_nerd_fonts
-    install_ohmyzsh
-    install_fzf_keybinds
-    install_tmux_oh_my_tmux
-    deploy_configs
-    register_xsession
+    # install_packages aborts on critical failures; everything else is
+    # best-effort but reports its own failures.
+    backup_existing       || return 1
+    install_packages      || return 1
+    install_nerd_fonts    || warn "Nerd Fonts: instalación parcial"
+    install_ohmyzsh       || warn "oh-my-zsh: instalación parcial"
+    install_fzf_keybinds  || warn "fzf: instalación parcial"
+    install_tmux_oh_my_tmux || warn "tmux: instalación parcial"
+    deploy_configs        || return 1
+    register_xsession     || return 1
 }
 
 main() {
@@ -315,6 +353,19 @@ main() {
     if [[ $rc -ne 0 ]]; then
         err "La instalación terminó con errores (rc=$rc). Revisa $LOG_FILE"
         exit "$rc"
+    fi
+
+    # Post-install sanity check: scream if bspwm or its session file are not
+    # in place — these are exactly the two things that have to be right for
+    # bspwm to be selectable at the LightDM login screen.
+    local fatal=()
+    command -v bspwm >/dev/null            || fatal+=("binario bspwm")
+    [[ -x /usr/share/xsessions/bspwm.desktop ]] || \
+        [[ -r /usr/share/xsessions/bspwm.desktop ]] || fatal+=("/usr/share/xsessions/bspwm.desktop")
+    if (( ${#fatal[@]} > 0 )); then
+        err "Comprobación final falló — faltan: ${fatal[*]}"
+        err "bspwm NO aparecerá en el selector de sesión. Revisa $LOG_FILE"
+        exit 1
     fi
 
     ok "Entorno desplegado correctamente."
