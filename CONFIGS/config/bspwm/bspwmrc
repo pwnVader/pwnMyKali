@@ -4,8 +4,27 @@
 # Java workaround for tiling WMs (Burp, ZAP, etc.)
 wmname LG3D &
 
-# VMware integration (no-op outside VMware)
-command -v vmware-user-suid-wrapper >/dev/null && vmware-user-suid-wrapper &
+# VMware integration: brings autofit (guest follows host window size),
+# clipboard sync, and drag-drop. Two paths exist on Kali rolling, and which
+# one is shipped depends on open-vm-tools-desktop version:
+#   1) vmtoolsd -n vmusr   (modern, ships with open-vm-tools-desktop >= 12)
+#   2) vmware-user-suid-wrapper (legacy, suid wrapper around vmtoolsd)
+# Try modern first, fall back to legacy, log failures to /tmp for debug.
+start_vmware_integration() {
+    pgrep -f 'vmtoolsd.*vmusr' >/dev/null 2>&1 && return 0
+    pgrep -x vmware-user-suid-wrapper >/dev/null 2>&1 && return 0
+
+    if command -v vmtoolsd >/dev/null 2>&1; then
+        vmtoolsd -n vmusr >/tmp/vmtoolsd.log 2>&1 &
+        return 0
+    fi
+    if command -v vmware-user-suid-wrapper >/dev/null 2>&1; then
+        vmware-user-suid-wrapper >/tmp/vmware-user.log 2>&1 &
+        return 0
+    fi
+    return 1
+}
+start_vmware_integration
 
 # Hotkey daemon
 pgrep -x sxhkd >/dev/null || sxhkd &
