@@ -82,12 +82,26 @@ xsetroot -cursor_name left_ptr &
 # To change the default: edit the OUTPUT_MODE below.
 # To switch on the fly from a terminal:
 #     xrandr --output "$(xrandr|awk '/ connected/ {print $1; exit}')" --mode WIDTHxHEIGHT
-OUTPUT_MODE="1920x1080"
+# OUTPUT_MODE controls the resolution forced at login. Two values:
+#   "auto"           → use xrandr's "+" preferred mode (which vmtoolsd sets
+#                      from the host window size at session start). Best on
+#                      laptops where you might log in at different sizes.
+#   "WIDTHxHEIGHT"   → pin a fixed mode (eg. "2560x1600", "1920x1080").
+#                      Best if you always run VMware fullscreen and want
+#                      polybar / kitty sized correctly from the start.
+OUTPUT_MODE="auto"
 OUTPUT_NAME=$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1; exit}')
 if [ -n "$OUTPUT_NAME" ]; then
+    if [ "$OUTPUT_MODE" = "auto" ]; then
+        # Pick the preferred mode (marked '+' by X) — this is what VMware
+        # advertised based on the current host window size.
+        OUTPUT_MODE=$(xrandr --query | awk '
+            / connected/ {seen=1; next}
+            seen && /^[[:space:]]/ && /\+/ {print $1; exit}')
+        [ -z "$OUTPUT_MODE" ] && OUTPUT_MODE="1920x1080"
+    fi
     if ! xrandr --query | grep -q "^   $OUTPUT_MODE "; then
-        # Mode is not in the list — create it on the fly with gtf so we can
-        # always switch to 1920x1080 even if VMware does not pre-advertise it.
+        # Mode not advertised — synthesise it with gtf and inject it.
         MODELINE=$(gtf "${OUTPUT_MODE%x*}" "${OUTPUT_MODE#*x}" 60 2>/dev/null \
                    | awk '/Modeline/ {$1=""; print substr($0,2)}')
         if [ -n "$MODELINE" ]; then

@@ -30,6 +30,12 @@ while sleep 2; do
     geom=$2
     if [ "$geom" != "$LAST" ]; then
         bspc monitor "$name" -g "$geom" 2>/dev/null
+        # Polybar reads its bar geometry only once at start; restart it so
+        # the bar spans the new screen width (without this it stays at the
+        # old size, leaving a stub on the right when the screen grows).
+        if [ -x "$HOME/.config/polybar/forest/launch.sh" ]; then
+            "$HOME/.config/polybar/forest/launch.sh" >/dev/null 2>&1 &
+        fi
         LAST="$geom"
     fi
 done
