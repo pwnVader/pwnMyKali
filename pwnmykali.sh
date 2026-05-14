@@ -309,9 +309,10 @@ deploy_configs() {
     sudo ln -sf "$HOME/.config/polybar/forest/scripts/screenshot.sh" /usr/bin/screenshot
 
     chmod +x "$HOME/.config/bspwm/bspwmrc" \
-             "$HOME/.config/bspwm/scripts/bspwm_resize" \
+             "$HOME/.config/bspwm/scripts/"* \
              "$HOME/.config/polybar/forest/launch.sh" \
-             "$HOME/.config/polybar/forest/scripts/"*.sh
+             "$HOME/.config/polybar/forest/scripts/"*.sh \
+             "$HOME/.config/polybar/forest/scripts/checkupdates"
 
     mkdir -p "$HOME/screenshots" "$HOME/Wallpapers"
     cp -rf "$RPATH/WALLPAPERS/"* "$HOME/Wallpapers/"

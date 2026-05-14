@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#
+# pwnMyKali — keep bspwm geometry in sync with xrandr inside VMware guests.
+#
+# When you resize the VMware Workstation window on the host, vmtoolsd-vmusr
+# calls `xrandr --output <NAME> --mode WxH` on the guest. But bspwm caches
+# the monitor geometry at startup and does not re-tile when RandR changes
+# it under its feet — result: the desktop stays the old size while the X
+# screen grows, leaving black borders.
+#
+# This watcher polls xrandr every 2 s; when it sees a new geometry it pushes
+# it into bspwm via `bspc monitor <name> -g <geom>`, which triggers a re-tile.
+
+set -uo pipefail
+
+LAST=""
+while sleep 2; do
+    line=$(xrandr --query 2>/dev/null | awk '
+        / connected/ {
+            for (i=1; i<=NF; i++)
+                if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$/) {
+                    print $1, $i
+                    exit
+                }
+        }')
+    [ -z "$line" ] && continue
+    # shellcheck disable=SC2086
+    set -- $line
+    name=$1
+    geom=$2
+    if [ "$geom" != "$LAST" ]; then
+        bspc monitor "$name" -g "$geom" 2>/dev/null
+        LAST="$geom"
+    fi
+done
