@@ -65,6 +65,27 @@ alias b64e='base64 -w0'
 alias t='target'
 alias tt='target reset'
 
+# setres WIDTHxHEIGHT — change guest resolution on demand.
+# Workaround for VMware autofit not firing in Kali rolling (no
+# xserver-xorg-video-vmware package; generic modesetting driver does not
+# propagate host-window-resize events from vmtoolsd to xrandr).
+#   $ setres 1920x1080
+#   $ setres 2560x1440
+setres() {
+    local mode="${1:-1920x1080}"
+    local out
+    out=$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1; exit}')
+    [ -z "$out" ] && { echo "setres: no connected output"; return 1; }
+    if ! xrandr --query | grep -q "^   ${mode} "; then
+        local ml
+        ml=$(gtf "${mode%x*}" "${mode#*x}" 60 2>/dev/null \
+             | awk '/Modeline/ {$1=""; print substr($0,2)}')
+        [ -n "$ml" ] && eval "xrandr --newmode $ml" 2>/dev/null
+        xrandr --addmode "$out" "$mode" 2>/dev/null
+    fi
+    xrandr --output "$out" --mode "$mode" && echo "$out → $mode"
+}
+
 # fzf keybindings if installed
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 

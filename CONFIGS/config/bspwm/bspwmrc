@@ -71,9 +71,29 @@ bspc config border_width 0
 # Cursor
 xsetroot -cursor_name left_ptr &
 
-# NOTE: deliberately NOT hardcoding xrandr here. Inside VMware,
-# vmware-user-suid-wrapper listens for window-resize events from the host and
-# calls xrandr on demand, so the guest auto-fits to whatever size you drag the
-# VMware window to. Locking the output to a fixed mode at startup defeats that.
-# If you are NOT on VMware and your screen comes up the wrong size, uncomment:
-#   xrandr --output "$(xrandr | awk '/ connected/ {print $1; exit}')" --auto &
+# Pin a usable resolution at startup.
+#
+# Kali rolling shipped without xserver-xorg-video-vmware (the package was
+# retired upstream), so the X server uses the generic modesetting driver.
+# With modesetting, vmtoolsd-vmusr cannot reliably push host-window-resize
+# events to xrandr — autofit-guest stops working dynamically. Manually
+# setting a mode via xrandr does work though, so we pin 1920x1080 at login.
+#
+# To change the default: edit the OUTPUT_MODE below.
+# To switch on the fly from a terminal:
+#     xrandr --output "$(xrandr|awk '/ connected/ {print $1; exit}')" --mode WIDTHxHEIGHT
+OUTPUT_MODE="1920x1080"
+OUTPUT_NAME=$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1; exit}')
+if [ -n "$OUTPUT_NAME" ]; then
+    if ! xrandr --query | grep -q "^   $OUTPUT_MODE "; then
+        # Mode is not in the list — create it on the fly with gtf so we can
+        # always switch to 1920x1080 even if VMware does not pre-advertise it.
+        MODELINE=$(gtf "${OUTPUT_MODE%x*}" "${OUTPUT_MODE#*x}" 60 2>/dev/null \
+                   | awk '/Modeline/ {$1=""; print substr($0,2)}')
+        if [ -n "$MODELINE" ]; then
+            xrandr --newmode $MODELINE 2>/dev/null
+            xrandr --addmode "$OUTPUT_NAME" "$OUTPUT_MODE" 2>/dev/null
+        fi
+    fi
+    xrandr --output "$OUTPUT_NAME" --mode "$OUTPUT_MODE" 2>/dev/null
+fi
